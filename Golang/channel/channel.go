@@ -188,9 +188,48 @@ func ReceiveHappenedBeforeSendFinished() {
 }
 
 func main() {
-	ReadClosedNoBufferChannel()
+	/*ReadClosedNoBufferChannel()
 	ReadClosedBufferChannel()
 
 	SendHappenedBeforeReceiveFinished()
-	ReceiveHappenedBeforeSendFinished()
+	ReceiveHappenedBeforeSendFinished()*/
+
+	PrintMsg()
+}
+
+func PrintMsg() {
+	numChan := make(chan int)
+	doneChan := make(chan bool)
+	// 生产奇数
+	go func() {
+		i := 1
+		for i < 50 {
+			if i%2 != 0 {
+				numChan <- i
+			}
+			i++
+		}
+	}()
+
+	time.Sleep(500 * time.Millisecond)
+
+	// 打印
+	go func() {
+		for {
+			select {
+			case i := <-numChan:
+				// 偶数
+				a := i + 1
+				// 打印奇数
+				println(i)
+				// 打印偶数
+				println(a)
+				if a == 50 {
+					doneChan <- true
+				}
+			}
+		}
+	}()
+
+	<-doneChan
 }
