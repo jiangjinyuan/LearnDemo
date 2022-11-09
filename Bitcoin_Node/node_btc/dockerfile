@@ -1,0 +1,46 @@
+FROM alpine AS build
+
+RUN apk --no-cache add autoconf automake libtool boost-dev libevent-dev libffi-dev openssl-dev bash coreutils git && \
+    apk --no-cache add --update alpine-sdk build-base
+
+ARG VERSION
+
+RUN git clone --depth 1 https://github.com/bitcoin/bitcoin.git --branch v$VERSION --single-branch
+
+WORKDIR /bitcoin
+
+RUN cd /bitcoin/depends; make NO_QT=1
+
+RUN wget https://zlib.net/zlib-1.2.13.tar.gz && \
+    echo "b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30  zlib-1.2.13.tar.gz" | sha256sum -c && \
+    mkdir -p /usr/src/zlib; tar zxvf zlib-1.2.13.tar.gz -C /usr/src && \
+    cd /usr/src/zlib-1.2.13; ./configure; make -j"$(($(nproc)+1))"; make -j"$(($(nproc)+1))" install
+
+RUN export CONFIG_SITE=/bitcoin/depends/$(/bitcoin/depends/config.guess)/share/config.site && \
+    cd /bitcoin; ./autogen.sh; ./contrib/install_db4.sh . && \
+    ./configure --disable-ccache \
+    --disable-maintainer-mode \
+    --disable-dependency-tracking \
+    --enable-reduce-exports --disable-bench \
+    --disable-tests \
+    --disable-gui-tests \
+    --without-gui \
+    --without-miniupnpc \
+    CFLAGS="-O2 -g0 --static -static -fPIC" \
+    CXXFLAGS="-O2 -g0 --static -static -fPIC" \
+    LDFLAGS="-s -static-libgcc -static-libstdc++ -Wl,-O2" \
+    BDB_LIBS="-L/bitcoin/db4/lib -ldb_cxx-4.8" \
+    BDB_CFLAGS="-I/bitcoin/db4/include"
+
+RUN make -j"$(($(nproc)+1))" && \
+    make -j"$(($(nproc)+1))" install
+
+FROM alpine:latest
+RUN apk --no-cache add supervisor
+COPY --from=build /usr/local /usr/local
+ADD bitcoin.conf /.bitcoin/bitcoin.conf
+ADD supervisor.conf /etc/supervisord.d/
+
+VOLUME ["/.bitcoin"]
+
+EXPOSE 8332 8333 18332 18333 18444

@@ -1,0 +1,7 @@
+FROM alpine:latest as builder
+
+COPY ./jwtsecret /root/.jwtsecret/geth/jwtsecret
+
+FROM prysmaticlabs/prysm-beacon-chain:v3.1.1
+
+COPY --from=builder /root/.jwtsecret/geth/jwtsecret /root/.jwtsecret/geth/jwtsecret

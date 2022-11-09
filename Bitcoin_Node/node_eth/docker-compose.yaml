@@ -1,0 +1,93 @@
+version: "3"
+services:
+  execution:
+    image: geth
+    container_name: eth-execution-geth
+    user: "root"
+    # restart: unless-stopped
+    ports:
+      - "8545:8545"
+      - "30303:30303"
+      - "8551:8551"
+    volumes:
+      - geth_data:/root/.ethereum
+      #- ./jwtsecret:/ethereum/.jwtsecret/geth/jwtsecret
+    stop_signal: SIGINT
+    stop_grace_period: 5m
+    command:
+      # 测试网
+      - --goerli
+      - --http
+      - --http.api
+      - "eth,net,web3"
+      - --http.addr=0.0.0.0
+      - --http.vhosts=*
+      - --http.corsdomain=*
+      - --ws
+      - --ws.origins=*
+      - --ws.addr=0.0.0.0
+      - --ws.api
+      - "eth,net,web3"
+      # - --graphql
+      # - --graphql.corsdomain=*
+      # - --graphql.vhosts=*
+      # Minimum number of executable transaction slots guaranteed per account (default: 16)
+      # - --txpool.accountslots=16
+      # Maximum number of non-executable transaction slots for all accounts (default: 1024)
+      # - --txpool.globalqueue=1024
+      # Maximum number of executable transaction slots for all accounts (default: 4096)
+      # - --txpool.globalslots=10000
+      # Maximum amount of time non-executable transaction are queued (default: 3h0m0s)
+      # - --txpool.lifetime=3h0m0s
+      # Megabytes of memory allocated to internal caching (default: 1024)
+      # - --cache=4096
+      # Maximum number of network peers (network disabled if set to 0) (default: 25)
+      # - --maxpeers=100
+      # Blockchain sync mode ("fast", "full", or "light")
+      - --syncmode=full
+      # Blockchain garbage collection mode ("full", "archive") (default: "full")
+      # - --gcmode=full
+      # - --snapshot=false
+      - --authrpc.port=8551
+      - --authrpc.vhosts=*
+      - --authrpc.jwtsecret=/root/.jwtsecret/geth/jwtsecret
+      - --authrpc.addr=eth-execution-geth
+    #  - --override.terminaltotaldifficulty=17000000000000000
+    #  - --http.vhosts "localhost,ok-go-ethereum-sepolia"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "10"
+  consensus:
+    image: prysm
+    container_name: eth-consensus-prysm
+    # restart: unless-stopped
+    command:
+      - --datadir=/data
+      - --prater
+      - --jwt-secret=/root/.jwtsecret/geth/jwtsecret
+      - --rpc-host=0.0.0.0
+      - --grpc-gateway-host=0.0.0.0
+      - --monitoring-host=0.0.0.0
+      - --execution-endpoint=http://eth-execution-geth:8551
+      - --accept-terms-of-use
+      - --checkpoint-sync-url=https://goerli.checkpoint-sync.ethpandaops.io
+      - --genesis-beacon-api-url=https://goerli.checkpoint-sync.ethpandaops.io
+    volumes:
+      - prysm_data:/data
+      #- ./jwtsecret:/root/.jwtsecret/geth/jwtsecret
+    ports:
+      - 4000:4000
+      - 8900:8080
+      - 3500:3500
+      - 13000:13000/tcp
+      - 12000:12000/udp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"
+        max-file: "10"
+volumes:
+  geth_data:
+  prysm_data:
